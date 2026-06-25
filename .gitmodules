@@ -1,0 +1,12 @@
+[submodule "pytorch"]
+	path = pytorch
+	url = git@github.com:JongseoKang/pytorch.git
+	branch = pytorch-chipyard
+[submodule "triton"]
+	path = triton
+	url = git@github.com:JongseoKang/triton.git
+	branch = pytorch-chipyard
+[submodule "triton_chipyard"]
+	path = triton_chipyard
+	url = https://github.com/JongseoKang/triton-chipyard.git
+	branch = pytorch-chipyard
