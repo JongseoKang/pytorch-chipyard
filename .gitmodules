@@ -10,3 +10,7 @@
 	path = triton_chipyard
 	url = https://github.com/JongseoKang/triton-chipyard.git
 	branch = pytorch-chipyard
+[submodule "llvm-project"]
+	path = llvm-project
+	url = git@github.com:JongseoKang/llvm-project.git
+	branch = pytorch-chipyard
