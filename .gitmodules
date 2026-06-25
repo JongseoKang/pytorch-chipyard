@@ -14,3 +14,7 @@
 	path = llvm-project
 	url = git@github.com:JongseoKang/llvm-project.git
 	branch = pytorch-chipyard
+[submodule "buddy-mlir"]
+	path = buddy-mlir
+	url = https://github.com/JongseoKang/LLAPI-buddy-mlir.git
+	branch = pytorch-chipyard
