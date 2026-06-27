@@ -40,7 +40,6 @@ popd
 ############################################################
 
 pushd llvm-project
-git checkout $(cat ../triton/cmake/llvm-hash.txt)
 mkdir -p build
 cmake -G Ninja -B build llvm \
     -DCMAKE_BUILD_TYPE=DEBUG \
@@ -57,7 +56,6 @@ popd
 # git clone https://github.com/microsoft/triton-shared.git triton_shared
 # git clone https://github.com/triton-lang/triton.git
 pushd triton
-git checkout $(cat ../triton_shared/triton-hash.txt)
 LLVM_INCLUDE_DIRS=$LLVM_BUILD_DIR/include \
   LLVM_LIBRARY_DIR=$LLVM_BUILD_DIR/lib \
   LLVM_SYSPATH=$LLVM_BUILD_DIR \
