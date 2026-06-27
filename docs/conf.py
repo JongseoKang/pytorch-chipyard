@@ -3,6 +3,7 @@
 project = "PyTorch-Chipyard"
 author = "PyTorch-Chipyard contributors"
 copyright = "2026, PyTorch-Chipyard contributors"
+language = "en"
 
 extensions = [
     "myst_parser",

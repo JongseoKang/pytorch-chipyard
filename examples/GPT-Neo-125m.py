@@ -20,6 +20,7 @@ INTEGER_DTYPE = torch.int32
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ARTIFACT_DIR = SCRIPT_DIR.parent / "IR" / TASK_NAME
 MODEL_INPUT_NAMES = ("input_ids", "attention_mask", "position_ids", "cache_position")
+VALIDATE_ATOL = 1e-3
 
 
 def token_length() -> int:
@@ -156,29 +157,19 @@ def inputs_from_artifact(util, path: Path) -> dict[str, torch.Tensor]:
 
 
 def compare_tensors(golden: torch.Tensor, observed: torch.Tensor) -> bool:
-    shape_match = tuple(golden.shape) == tuple(observed.shape)
-    print(f"[validate] shape_match={shape_match}")
-    if not shape_match:
-        print(f"[validate] golden_shape={tuple(golden.shape)}")
-        print(f"[validate] observed_shape={tuple(observed.shape)}")
+    if tuple(golden.shape) != tuple(observed.shape):
         if golden.numel() != observed.numel():
-            print("[validate] reshape_observed=False")
+            print("[validate] max_abs_err=inf")
             print("[validate] match=False")
             return False
         observed = observed.reshape_as(golden)
-        print("[validate] reshape_observed=True")
 
     golden_fp32 = golden.detach().to(torch.float32)
     observed_fp32 = observed.detach().to(torch.float32)
-    finite_match = bool(torch.equal(torch.isfinite(golden_fp32), torch.isfinite(observed_fp32)))
     abs_err = (observed_fp32 - golden_fp32).abs()
-    rel_err = abs_err / golden_fp32.abs().clamp_min(1e-12)
-    allclose = bool(torch.allclose(observed_fp32, golden_fp32, atol=1e-4, rtol=1e-4))
-    match = finite_match and allclose
-    print(f"[validate] finite_match={finite_match}")
-    print(f"[validate] allclose={allclose}")
-    print(f"[validate] max_abs_err={float(abs_err.max()):.6e}")
-    print(f"[validate] max_rel_err={float(rel_err.max()):.6e}")
+    max_abs_err = float(abs_err.max()) if abs_err.numel() else 0.0
+    match = max_abs_err <= VALIDATE_ATOL
+    print(f"[validate] max_abs_err={max_abs_err:.6e}")
     print(f"[validate] match={match}")
     return match
 

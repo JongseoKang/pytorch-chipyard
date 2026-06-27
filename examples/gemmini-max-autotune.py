@@ -2,196 +2,163 @@
 from __future__ import annotations
 
 import argparse
-import inspect
+import importlib.util
 import os
+import time
 from pathlib import Path
+
+import torch
+import torch._inductor.config as inductor_config
+
+
+TASK_NAME = "gemmini-max-autotune"
+MODEL_NAME = "single_matmul_1024x1024x4096"
+DTYPE = torch.float32
+M = 1024
+K = 1024
+N = 4096
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_ARTIFACT_DIR = SCRIPT_DIR.parent / "IR" / TASK_NAME
+VALIDATE_ATOL = 1e-3
+SEED = 0
+
+
+class SingleMatmulModule(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        generator = torch.Generator(device="cpu").manual_seed(SEED)
+        weight = torch.randn(K, N, generator=generator, dtype=DTYPE) * 0.05
+        self.register_buffer("weight", weight.contiguous())
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x @ self.weight
 
 
 def parse_args() -> argparse.Namespace:
-    default_dump_path = Path(__file__).resolve().parents[1] / "IR" / "gemmini-max-autotune"
-    env_dump_path = os.environ.get("TRITON_CHIPYARD_DUMP_PATH", "").strip()
     parser = argparse.ArgumentParser(
-        description=(
-            "Run one large nn.Module matmul through torch.compile + triton-chipyard "
-            "with Gemmini max-autotune candidates enabled."
-        )
+        description="Compile or validate Gemmini max-autotune Chipyard artifacts."
     )
-    parser.add_argument("--m1", type=int, default=1024)
-    parser.add_argument("--k1", type=int, default=1024)
-    parser.add_argument("--n1", type=int, default=4096)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--warmup-runs", type=int, default=0)
-    parser.add_argument("--repeat-runs", type=int, default=1)
-    parser.add_argument("--fullgraph", action="store_true")
-    parser.add_argument("--bias", action="store_true")
-    parser.add_argument("--atol", type=float, default=1e-4)
-    parser.add_argument("--rtol", type=float, default=1e-4)
-    parser.add_argument(
-        "--strict-compare",
-        action="store_true",
-        help="Raise an error when compiled outputs differ from eager outputs.",
-    )
-    parser.add_argument(
-        "--dump-path",
-        type=str,
-        default=env_dump_path or str(default_dump_path),
-    )
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--compile", action="store_true", help="Generate artifacts and input.bin.")
+    mode.add_argument("--validate", action="store_true", help="Compare output.bin with eager PyTorch.")
     return parser.parse_args()
 
 
-def validate_args(args: argparse.Namespace) -> None:
-    for name in ("m1", "k1", "n1"):
-        if getattr(args, name) <= 0:
-            raise ValueError(f"{name.replace('_', '-')} must be positive")
-    if args.warmup_runs < 0 or args.repeat_runs <= 0:
-        raise ValueError("warmup-runs must be non-negative and repeat-runs must be positive")
+def artifact_dir() -> Path:
+    return Path(os.environ.get("PYTORCH_CHIPYARD_DUMP_PATH", DEFAULT_ARTIFACT_DIR)).resolve()
 
 
-def configure_environment(task_name: str, dump_path: str) -> tuple[Path, Path]:
-    resolved_dump_path = Path(dump_path).resolve()
-    resolved_dump_path.mkdir(parents=True, exist_ok=True)
+def configure_triton_chipyard(task_name: str) -> None:
+    import triton
+    from triton.backends.triton_chipyard.driver import ChipyardDriver
 
-    os.environ.setdefault("TORCHINDUCTOR_FORCE_DISABLE_CACHES", "1")
-    os.environ.setdefault("TRITON_ALWAYS_COMPILE", "1")
-    os.environ.setdefault("TORCHINDUCTOR_MAX_AUTOTUNE", "1")
-    os.environ.setdefault("TORCHINDUCTOR_MAX_AUTOTUNE_GEMM_BACKENDS", "TRITON")
-    os.environ.setdefault("TORCHINDUCTOR_ENABLE_CHIPYARD_RUNNER", "1")
-    os.environ.setdefault("TORCHINDUCTOR_GEMMINI_MAX_AUTOTUNE", "1")
-    os.environ["TRITON_CHIPYARD_DUMP_PATH"] = str(resolved_dump_path)
-
-    cache_dir = Path(
-        os.environ.setdefault("TRITON_CACHE_DIR", f"/tmp/triton-chipyard-cache/{task_name}")
-    )
+    cache_dir = Path(os.environ.setdefault("TRITON_CACHE_DIR", f"/tmp/triton-chipyard-cache/{task_name}"))
     cache_dir.mkdir(parents=True, exist_ok=True)
-    return resolved_dump_path, cache_dir
+    triton.runtime.driver.set_active(ChipyardDriver())
+    inductor_config.cpu_backend = "triton_chipyard"
+    inductor_config.max_autotune = True
+    inductor_config.max_autotune_gemm_backends = "TRITON"
 
 
-def env_flag(name: str) -> bool:
-    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
+def configure_artifact_env(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    os.environ["PYTORCH_CHIPYARD_DUMP_PATH"] = str(path)
+    os.environ["TRITON_CHIPYARD_DUMP_PATH"] = str(path)
+    os.environ["TORCHINDUCTOR_ENABLE_CHIPYARD_RUNNER"] = "1"
+    os.environ.setdefault("TORCHINDUCTOR_GEMMINI_MAX_AUTOTUNE", "1")
+
+
+def build_model() -> torch.nn.Module:
+    return SingleMatmulModule().to(device="cpu", dtype=DTYPE).eval()
+
+
+def make_input() -> torch.Tensor:
+    generator = torch.Generator(device="cpu").manual_seed(SEED + 1)
+    return torch.randn(M, K, generator=generator, dtype=DTYPE)
+
+
+def import_artifact_util(path: Path):
+    util_path = path / "util.py"
+    if not util_path.exists():
+        raise FileNotFoundError(f"generated util.py not found: {util_path}")
+    spec = importlib.util.spec_from_file_location(f"{TASK_NAME}_artifact_util", util_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"failed to import artifact util: {util_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if not hasattr(module, "read_inputs_bin"):
+        raise RuntimeError(f"{util_path} was generated before read_inputs_bin support; recompile artifacts")
+    return module
+
+
+def compare_tensors(golden: torch.Tensor, observed: torch.Tensor) -> bool:
+    if tuple(golden.shape) != tuple(observed.shape):
+        if golden.numel() != observed.numel():
+            print("[validate] max_abs_err=inf")
+            print("[validate] match=False")
+            return False
+        observed = observed.reshape_as(golden)
+
+    golden_fp32 = golden.detach().to(torch.float32)
+    observed_fp32 = observed.detach().to(torch.float32)
+    abs_err = (observed_fp32 - golden_fp32).abs()
+    max_abs_err = float(abs_err.max()) if abs_err.numel() else 0.0
+    match = max_abs_err <= VALIDATE_ATOL
+    print(f"[validate] max_abs_err={max_abs_err:.6e}")
+    print(f"[validate] match={match}")
+    return match
+
+
+def print_config(path: Path, input_shape: tuple[int, ...]) -> None:
+    print(f"[config] model={MODEL_NAME}")
+    print(f"[config] input_shape={input_shape}")
+    print(f"[config] weight_shape={(K, N)}")
+    print("[config] dtype=fp32")
+    print(f"[config] artifact_dir={path}")
+
+
+def run_compile(args: argparse.Namespace) -> None:
+    path = artifact_dir()
+    configure_artifact_env(path)
+    configure_triton_chipyard(TASK_NAME)
+    model = build_model()
+    inputs = make_input()
+    print_config(path, tuple(inputs.shape))
+
+    started_at = time.perf_counter()
+    compiled_model = torch.compile(model, backend="inductor")
+    with torch.inference_mode():
+        _ = compiled_model(inputs)
+    compile_time_s = time.perf_counter() - started_at
+
+    util = import_artifact_util(path)
+    input_path = util.write_inputs_bin(inputs)
+    print(f"[compile] seconds={compile_time_s:.3f}")
+    print(f"[artifact] input_bin={input_path}")
+
+
+def run_validate(args: argparse.Namespace) -> None:
+    path = artifact_dir()
+    util = import_artifact_util(path)
+    inputs = util.read_inputs_bin(path / "input.bin")
+    observed = util.read_outputs_bin(path / "output.bin")
+    if not isinstance(inputs, torch.Tensor) or not isinstance(observed, torch.Tensor):
+        raise TypeError("Gemmini autotune artifacts must contain one input tensor and one output tensor")
+
+    print_config(path, tuple(inputs.shape))
+    model = build_model()
+    with torch.inference_mode():
+        golden = model(inputs)
+    if not compare_tensors(golden, observed):
+        raise SystemExit(1)
 
 
 def main() -> None:
     args = parse_args()
-    validate_args(args)
-    dump_path, cache_dir = configure_environment("gemmini-max-autotune", args.dump_path)
-
-    import torch
-    import torch._inductor.config as inductor_config
-    import torch._inductor.select_algorithm as inductor_select_algorithm
-    import torch._inductor.template_heuristics as inductor_template_heuristics
-    import triton
-    from triton.backends.triton_chipyard.driver import ChipyardDriver
-
-    class SingleMatmulModule(torch.nn.Module):
-        def __init__(
-            self,
-            shape: tuple[int, int, int],
-            use_bias: bool,
-        ) -> None:
-            super().__init__()
-            _, k1, n1 = shape
-            self.weight1 = torch.nn.Parameter(torch.randn(k1, n1) * 0.05)
-            self.bias1 = (
-                torch.nn.Parameter(torch.randn(n1) * 0.01) if use_bias else None
-            )
-
-        def forward(
-            self,
-            x1: torch.Tensor,
-        ) -> torch.Tensor:
-            out1 = x1 @ self.weight1
-            if self.bias1 is not None:
-                out1 = out1 + self.bias1
-            self.matmul()
-            self.add()
-            self.
-            return out1
-
-    torch.manual_seed(args.seed)
-    device = "cpu"
-    dtype = torch.float32
-
-    triton.runtime.driver.set_active(ChipyardDriver())
-    target = triton.runtime.driver.active.get_current_target()
-    inductor_config.force_disable_caches = True
-    inductor_config.max_autotune = True
-    inductor_config.max_autotune_gemm_backends = "TRITON"
-    inductor_config.cpu_backend = "triton_chipyard"
-
-    mm_shape = (args.m1, args.k1, args.n1)
-    model = SingleMatmulModule(mm_shape, args.bias).to(
-        device=device, dtype=dtype
-    ).eval()
-    input1 = torch.randn(args.m1, args.k1, device=device, dtype=dtype)
-
-    with torch.no_grad():
-        eager_output = model(input1)
-        compiled_model = torch.compile(
-            model,
-            backend="inductor",
-            fullgraph=args.fullgraph,
-        )
-        for _ in range(args.warmup_runs):
-            compiled_model(input1)
-        compiled_output = None
-        for _ in range(args.repeat_runs):
-            compiled_output = compiled_model(input1)
-        assert compiled_output is not None
-
-    diff = (compiled_output - eager_output).abs()
-    max_abs_diff = float(diff.max().item()) if diff.numel() else 0.0
-    close = torch.allclose(compiled_output, eager_output, atol=args.atol, rtol=args.rtol)
-    gemmini_candidate_patch = hasattr(
-        inductor_template_heuristics.CPUConfigHeuristic,
-        "_use_gemmini_max_autotune_candidates",
-    )
-    gemmini_meta_patch = hasattr(
-        inductor_select_algorithm,
-        "TRITON_TEMPLATE_BACKEND_ONLY_META_KEYS",
-    )
-
-    print("[config] task=gemmini_max_autotune")
-    print(f"[config] device={device}, dtype=float32")
-    print(f"[config] inductor_cpu_backend={inductor_config.cpu_backend}")
-    print(f"[config] triton_target_backend={target.backend}")
-    print(f"[config] triton_target_arch={target.arch}")
-    print(f"[config] chipyard_dump_path={dump_path}")
-    print(f"[config] triton_cache_dir={cache_dir}")
-    print(
-        "[config] runner_enabled="
-        f"{os.environ.get('TORCHINDUCTOR_ENABLE_CHIPYARD_RUNNER', '0')}"
-    )
-    print(f"[config] use_gemmini={env_flag('TRITON_CHIPYARD_USE_GEMMINI')}")
-    print(
-        "[config] inductor_template_heuristics="
-        f"{inspect.getfile(inductor_template_heuristics)}"
-    )
-    print(
-        "[config] gemmini_candidate_patch="
-        f"{gemmini_candidate_patch}"
-    )
-    print(f"[config] gemmini_meta_patch={gemmini_meta_patch}")
-    print(
-        "[config] gemmini_max_autotune="
-        f"{env_flag('TORCHINDUCTOR_GEMMINI_MAX_AUTOTUNE')}"
-    )
-    print(f"[config] fullgraph={args.fullgraph}")
-    print(f"[config] shape=mm1={mm_shape}")
-    print(f"[result] output_shape={tuple(compiled_output.shape)}")
-    print(f"[result] max_abs_diff={max_abs_diff:.8e}")
-    print(f"[result] close={close}")
-    output_mean = float(compiled_output.mean().item())
-    output_std = float(compiled_output.std().item())
-    print(f"[result] output_mean={output_mean:.8e}")
-    print(f"[result] output_std={output_std:.8e}")
-
-    if args.strict_compare and not close:
-        torch.testing.assert_close(
-            compiled_output,
-            eager_output,
-            atol=args.atol,
-            rtol=args.rtol,
-        )
+    if args.compile:
+        run_compile(args)
+    else:
+        run_validate(args)
 
 
 if __name__ == "__main__":

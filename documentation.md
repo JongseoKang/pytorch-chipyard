@@ -1,248 +1,57 @@
-# PyTorch-Chipyard Website Documentation Plan
+documentation
 
-This document records the proposed website documentation structure for
-PyTorch-Chipyard. The goal is to satisfy the CGO tool-paper documentation
-requirement with a focused website that explains the tool, shows how to get
-started, and points readers to runnable tutorials and examples.
 
-The documentation should stay compact at first. It should avoid creating empty
-or redundant pages before the project is ready for public users.
+Installation
+pytorch-chipyard github repo의 readme를 그대로 따라하면됨. 해당 레포는 chipyard/firesim 까지만 포함하고 있고, vivado 를 비롯해 fpga 세팅은 포함하고 있지 않음. (구체적으로 뭘 더 설치해야하는지는 너가 이 글 옆에 적어: {TODO} )
+또한 해당 프로젝트는 버전에 굉장히 민감하기 때문에, triton, chipyard commit 을 고정시켜놓았는데, 혹시나 다른 커밋 버전에서도 작동할 수도 있음. 하지만 pytorch, llvm, buddy, triton-chipyard는 이 레포에서 포함하고 있는 custom version을 그대로 사용해야함.
 
-## Documentation Goals
+Tutorials
+- triton-chipyard(matmul)
+우리의 논문은 torch model 실행을 목적으로 했지만 부수적으로 triton-chipyard 역시 독립적으로 사용이 가능하다. Installation을 그대로 따라하면, triton-chipyard도 자동으로 같이 설치되는데, triton-chipyard를 단독으로 사용하고 싶으면, "verilator 경로 환경변수"를 설정해서 verilator를 통해 host python 안에서 bare-metal로 커널을 측정해볼 수 있다.
 
-- Present PyTorch-Chipyard as a reusable compiler-stack foundation for ML
-  research on Chipyard hardware.
-- Help a new reader understand the project scope quickly.
-- Provide a clear path from checkout/setup to the first runnable example.
-- Keep PyTorch-Chipyard examples and Triton-Chipyard examples visibly separate.
-- Document supported functionality and current limitations honestly.
-- Leave citation and license information as placeholders until the final wording
-  is confirmed with the advisor.
+triton_chipyard repo 안의 example을 그대로 따라 할 수 있는데, 여기서는 가장 간단한 matmul 예제를 설명한다.(참고로 이 코드의 triton kernel 거의 triton-shared repo에서 복사해온건데, citation 달아야되나? 이거 한번 확인해봐).
 
-## Proposed Website Pages
-
-The initial website should use the following top-level pages:
-
-```text
-Overview
-Getting Started
-Tutorials and Examples
-Supported Features and Limitations
-Citation and License
 ```
-
-This structure intentionally omits separate pages for troubleshooting,
-configuration, paper-result reproduction, and the compiler pipeline. Those topics
-are either premature or overlap with the pages above.
-
-## Page Details
-
-### Overview
-
-The overview page should be the landing page for the documentation site. It
-should explain what PyTorch-Chipyard is, who it is for, and how the main
-components fit together.
-
-Suggested content:
-
-- One-paragraph project summary.
-- The relationship between PyTorch-Chipyard and Triton-Chipyard.
-- A short end-to-end flow:
-
-```text
-PyTorch model
-  -> TorchInductor / Triton
-  -> Triton-Chipyard lowering
-  -> MLIR / Buddy / Gemmini-oriented artifacts
-  -> Chipyard execution path
+대충 ./triton_chipyard/example/test_matmul.py의 코드
 ```
+보여주고, 
 
-- A short note that the project is research infrastructure for compiling ML
-  workloads toward Chipyard/Gemmini-style hardware targets.
-- Links to Getting Started and Tutorials and Examples.
+%%%실행 명령어와 필요한 환경변수 세팅 설명.
+너가 triton_chipyard 분석해서 작성해
+%%%
 
-There should not be a separate "Compiler Pipeline" page for now. The overview
-page can carry the high-level pipeline explanation.
+- pytorch-chipyard(resnet50)
 
-### Getting Started
-
-The getting-started page should be the first hands-on path through the project.
-It should contain the smallest reliable sequence that lets a reader set up the
-repository and run one example.
-
-Suggested content:
-
-- Repository layout.
-- Required dependencies and expected checkout structure.
-- Environment setup.
-- How to enable the Triton-Chipyard backend.
-- How to run the smallest recommended example.
-- Where generated artifacts are written.
-- What output files or logs indicate that the run succeeded.
-
-This page can include setup/configuration details, but there should not be a
-separate "Configuration" page yet. Any target assumptions, environment variables,
-or hardware-related settings that matter to users can be documented here or in
-Supported Features and Limitations.
-
-### Tutorials and Examples
-
-Tutorials and examples should be merged into one section. For this project, the
-distinction between a tutorial and an example is not useful enough to justify
-separate pages at the start. A tutorial can simply be a more detailed example.
-
-This section should be divided into two groups.
-
-#### PyTorch-Chipyard Examples
-
-These examples should cover model-level compilation from PyTorch through the
-PyTorch-Chipyard path.
-
-Current candidate examples:
-
-- `examples/AlexNet.py`
-- `examples/SqueezeNet.py`
-- `examples/ResNet50.py`
-- `examples/MobileNetV2.py`
-- `examples/GPT2.py`
-- `examples/GPT-Neo-125m.py`
-- `examples/Opt-125m.py`
-- `examples/Pythia-160m.py`
-- `examples/gemmini-max-autotune.py`
-
-Each example entry should eventually include:
-
-- What the example demonstrates.
-- The command to run it.
-- Required model/data inputs.
-- Expected artifact directory.
-- Expected generated files.
-- Any known constraints.
-
-#### Triton-Chipyard Examples
-
-These examples should cover lower-level Triton-Chipyard behavior and backend
-validation. They are useful for readers who want to inspect compiler behavior
-below the model level.
-
-Current candidate examples:
-
-- `triton_chipyard/example/test_matmul.py`
-- `triton_chipyard/example/test_softmax.py`
-- `triton_chipyard/example/test_conv.py`
-- `triton_chipyard/example/test_layernorm.py`
-- `triton_chipyard/example/test_runner.py`
-
-Current candidate scripts:
-
-- `triton_chipyard/scripts/run-cnn.sh`
-- `triton_chipyard/scripts/run-llm.sh`
-- `triton_chipyard/scripts/run_vision_artifacts.sh`
-- `triton_chipyard/scripts/run_llm_prefill_artifacts.sh`
-- `triton_chipyard/scripts/run_llm_flex_window_prefill_artifacts.sh`
-- `triton_chipyard/scripts/verify-cnn-output.py`
-- `triton_chipyard/scripts/verify-llm-output.py`
-- `triton_chipyard/scripts/pack-llm-input.py`
-
-The paper-result reproduction material can be folded into this section instead
-of becoming a separate "Reproducing Paper Results" page. If an example
-corresponds to a paper figure, table, or artifact, tag it explicitly in the
-example description.
-
-### Supported Features and Limitations
-
-This page should combine user-visible support status, target assumptions, and
-current limitations. It replaces a separate configuration page.
-
-Suggested supported-feature topics:
-
-- Model-level PyTorch compilation through TorchInductor.
-- Triton-Chipyard as the backend path for generated kernels.
-- Generation of Chipyard/Gemmini-oriented runner artifacts.
-- Vision-model examples such as AlexNet, SqueezeNet, ResNet50, and MobileNetV2.
-- LLM examples such as GPT-2, GPT-Neo, OPT, and Pythia variants.
-- Artifact files such as `runner.cpp`, `model_spec.json`, `weights.bin`,
-  `input.bin`, `output.bin`, and generated build scripts.
-- Lower-level Triton examples for matmul, softmax, convolution, layernorm, and
-  runner testing.
-
-Suggested limitation topics:
-
-- The strongest path is currently model-level PyTorch Inductor compilation into
-  Chipyard runner artifacts.
-- Matmul support is centered on 2D dot/matmul patterns. Batched matmul support
-  should be described carefully if it is represented through launch dimensions
-  rather than rank-3 batch matmul lowering.
-- Convolution and pooling support should be described in terms of the currently
-  validated Inductor/Triton paths.
-- Flex attention and SDPA support should be marked experimental if they are not
-  fully validated.
-- Some target-friendly math rewrites may still require more numerical validation.
-- Exact environment and checkout-layout assumptions should be documented here
-  when they affect whether examples run.
-
-### Citation and License
-
-This page should exist, but its content can remain as a placeholder until the
-advisor confirms the final wording.
-
-Suggested placeholder:
-
-```markdown
-# Citation and License
-
-## Citation
-
-TODO: Add the final paper citation and BibTeX entry after the submission metadata
-is confirmed.
-
-## License
-
-TODO: Confirm the repository license and third-party license notes before public
-release.
 ```
-
-## Pages Not Included Initially
-
-The following pages should not be created as standalone pages in the initial
-website.
-
-### Troubleshooting
-
-Do not add this page yet. The project has not been publicly distributed, so
-there are no real user-facing troubleshooting cases to document. It can be added
-later after common setup or runtime issues are known.
-
-### Configuration
-
-Do not add a separate configuration page yet. Configuration-like information
-should be included in Getting Started when it is required to run the first
-example, or in Supported Features and Limitations when it describes target
-assumptions.
-
-### Reproducing Paper Results
-
-Do not add a separate reproduction page yet. The content would likely be large
-and would overlap heavily with tutorials and examples. Paper-related examples can
-be tagged inside Tutorials and Examples.
-
-### Compiler Pipeline
-
-Do not add a separate compiler-pipeline page yet. The overview page should carry
-the high-level pipeline summary.
-
-## Suggested Initial File Layout
-
-If the website uses Markdown pages, the documentation can start with this layout:
-
-```text
-docs/
-  index.md
-  getting-started.md
-  tutorials-and-examples.md
-  supported-features-and-limitations.md
-  citation-and-license.md
+대충 ./examples/ResNet50.py 코드
 ```
+보여주고,
 
-If the documentation remains a single page at first, this `documentation.md`
-file can be used as the source outline and expanded into the website pages later.
+%%%실행 명령어와 필요한 환경변수 세팅 설명
+너가 ./scripts/env.sh 분석해서 작성해
+이부분이 사실상 사용법을 설명하는데 매우 주요한 역할을 하니 매우 상세하게 설명하도록. 빠지는 환경변수가 없어야해.
+%%%
+
+pytorch-chipyard
+- overview
+./docs/figures/system-overview.pdf 넣어놨으니까 활용
+- pytorch 쪽 수정사항
+./docs/figures/chipyard-artifact-generation.pdf 넣어놨으니까 활용
+
+기본적으로 host runtime 에 모델이 실행되는 
+- triton-chipyard
+
+Supported Features & Limitations
+
+아래의 내용을 잘 분류 및 정렬해서 소제목 달아서 설명
+
+triton-chipyard는 inductor lowering이 만드는 대부분의 op을 만들 수 있음.
+다만 이와오는 무관하게, 기존 triton에서 지원하는 python api와는 몇가지 차이점이 존재함.
+우선 triton 자체의 autotune 기능은 지원하지 않음. triton autotune은 host 에 kernel name, args, metadata 등을 캐싱하여, 동일한 입력이 들어오면, 다시커널을 컴파일 하지 않고, 
+해당 shape에 대해서 최적의 커널을 바로 가져옴. 그러나 현재 architecture에서는 verilator를 통한 cycle accurate performance measure이 가능함에도 너무 느린 속도 때문에 host 쪽에서 
+autotune을 아예 지원하고 있지 않음. 이에 따라 발생하는 가장 큰 차이점은, inductor 쪽에서 triton kernel을 생성할 때, pointwise(e.g. reduction, add 등의 loopwise 구조) 의 비교적 단순한 형태의 kernel에 대해서는 triton autotune 기능을 사용하지만, matmul, conv, attention 등 template kernel 에 대해서는 inductor 자체적으로 autotune cache를 관리하며 여러 커널을 만들게 됨. pytorch-chipyard는 inductor에서 생성한 operator 별 autotune kernel candidate들은 전부 runner.cpp에 반영해서 실제 cycle accurate autotune을 진행하지만, pointwise kernel에 대해서는 autotune을 진행하지 않고 있음.
+
+또한 다른 큰 차이점은 tl.dot에 있는데, 원본 triton은 tl.dot에대해서 3차원 tensor가 입력으로 들어오면 batched matmul로 판단하고 lowering함. 하지만, triton-chipyard에서는 오직 2d matmul 형태만 tl.dot으로 받고 있음. 실제 batched matmul kernel을 생성할 때는, triton kernel level에서 별도의 batched matmul 을 작성해야하고, 실제 inductor template kernel에도 그렇게 반영되어있음.
+
+구조적으로 inductor 뒤에 triton_chipyard backend를 추가한 방식이기 때문에
+graph break 이 있는 모델들은 실행되지 않음. 이의 가장 대표적인 예가 hf model 들의 decoding step, torch op이 아닌 pure python if 를 갖다 박아넣어서 loop 을 돌리기 때문에  grpah break 이 생겨서 inductor가 여러번 호출됨. 현재 구조는 inductor 하나가 호출 될때마다 하나의 runner.cpp를 만드는 구조이기 때문에, 이러한 형태의 torch model을 지원하지 못함
