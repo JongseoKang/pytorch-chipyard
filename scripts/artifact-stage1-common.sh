@@ -225,8 +225,6 @@ pc_backend_env_array() {
         TRITON_CHIPYARD_RISCV_MARCH=rv64imafdcv_zicsr_zifencei_zvl128b
         TRITON_CHIPYARD_RISCV_MABI=lp64d
         TRITON_CHIPYARD_RISCV_VARCH=vlen:128,elen:64
-        TRITON_CHIPYARD_SPIKE_ISA=rv64gcv
-        TRITON_CHIPYARD_SPIKE_VARCH=vlen:128,elen:64
       )
       ;;
     scalar)
@@ -250,8 +248,6 @@ pc_run_backend_env() {
   if [[ "${backend}" == "gemmini" || "${backend}" == "scalar" ]]; then
     env \
       -u TRITON_CHIPYARD_RISCV_VARCH \
-      -u TRITON_CHIPYARD_SPIKE_ISA \
-      -u TRITON_CHIPYARD_SPIKE_VARCH \
       "${backend_env[@]}" \
       "$@"
   else

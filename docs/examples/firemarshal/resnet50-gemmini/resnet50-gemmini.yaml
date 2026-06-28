@@ -1,9 +1,0 @@
-{
-  "name" : "pytorch-chipyard-resnet50-gemmini",
-  "base" : "br-base.json",
-  "workdir" : ".",
-  "host-init" : "build.sh",
-  "overlay" : "overlay",
-  "command" : "/root/pytorch-chipyard-resnet50/run.sh",
-  "spike-args" : "--extension=gemmini"
-}

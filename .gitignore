@@ -203,6 +203,16 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# pytorch-chipyard generated figure inputs/outputs
+scripts/.cache/
+scripts/.csv/
+scripts/.logs/
+scripts/.matplotlib/
+scripts/figures/results-workload/
+scripts/figures/*.pdf
+scripts/figures/*.png
+scripts/figures/.plot_results_start
+
 # Ruff stuff:
 .ruff_cache/
 

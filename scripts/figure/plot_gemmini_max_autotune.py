@@ -27,7 +27,7 @@ apply_plot_style()
 FIGURE_DIR = ROOT_DIR / "figures"
 FIGURE_DIR.mkdir(exist_ok=True)
 
-LOG_GLOB = "*gemmini-max-autotune-fp32-4core-autotune.log"
+LOG_GLOB = "*gemmini-max-autotune*4core-autotune.log"
 OUT_STEM = "autotune_gemmini_max"
 
 BASELINE_BLOCKING = (64, 64, 32)

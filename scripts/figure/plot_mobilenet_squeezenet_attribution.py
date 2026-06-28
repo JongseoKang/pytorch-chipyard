@@ -10,7 +10,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = ROOT_DIR / ".logs"
 FIGURE_DIR = ROOT_DIR / "figures"
-IR_DIR = ROOT_DIR.parent / "triton_chipyard" / "IR"
+ARTIFACT_ROOT = Path(os.environ.get("PYTORCH_CHIPYARD_ARTIFACT_ROOT", ROOT_DIR.parent / "examples"))
+LEGACY_IR_DIR = ROOT_DIR.parent / "triton_chipyard" / "IR"
 
 MPLCONFIGDIR = ROOT_DIR / ".matplotlib"
 XDG_CACHE_HOME = ROOT_DIR / ".cache"
@@ -75,26 +76,26 @@ RUNS = [
     RunSpec(
         "MobileNetV2",
         "Rocket 4",
-        "2026-05-25--07-52-21-mobilenet-rocket-4core-model.log",
-        "2026-05-25--07-52-21-mobilenet-rocket-4core-autotune.log",
+        "mobilenetv2-rocket-4core-model.log",
+        "mobilenetv2-rocket-4core-autotune.log",
     ),
     RunSpec(
         "MobileNetV2",
         "Gemmini 2",
-        "2026-05-26--04-52-26-mobilenet-gemmini-2core-model.log",
-        "2026-05-26--04-52-26-mobilenet-gemmini-2core-autotune.log",
+        "mobilenetv2-gemmini-2core-model.log",
+        "mobilenetv2-gemmini-2core-autotune.log",
     ),
     RunSpec(
         "SqueezeNet",
         "Rocket 4",
-        "2026-05-24--05-22-48-squeezenet-rocket-4core-model.log",
-        "2026-05-24--05-22-48-squeezenet-rocket-4core-autotune.log",
+        "squeezenet-rocket-4core-model.log",
+        "squeezenet-rocket-4core-autotune.log",
     ),
     RunSpec(
         "SqueezeNet",
         "Gemmini 2",
-        "2026-05-24--10-13-33-squeezenet-gemmini-2core-model.log",
-        "2026-05-24--10-13-33-squeezenet-gemmini-2core-autotune.log",
+        "squeezenet-gemmini-2core-model.log",
+        "squeezenet-gemmini-2core-autotune.log",
     ),
 ]
 
@@ -102,38 +103,38 @@ ROCKET_SCALING_RUNS = [
     RunSpec(
         "MobileNetV2",
         "4",
-        "2026-05-25--07-52-21-mobilenet-rocket-4core-model.log",
-        "2026-05-25--07-52-21-mobilenet-rocket-4core-autotune.log",
+        "mobilenetv2-rocket-4core-model.log",
+        "mobilenetv2-rocket-4core-autotune.log",
     ),
     RunSpec(
         "MobileNetV2",
         "8",
-        "2026-05-27--06-14-45-mobilenet-rocket-8core-model.log",
-        "2026-05-27--06-14-45-mobilenet-rocket-8core-autotune.log",
+        "mobilenetv2-rocket-8core-model.log",
+        "mobilenetv2-rocket-8core-autotune.log",
     ),
     RunSpec(
         "MobileNetV2",
         "16",
-        "2026-05-27--06-44-37-mobilenet-rocket-16core-model.log",
-        "2026-05-27--06-44-37-mobilenet-rocket-16core-autotune.log",
+        "mobilenetv2-rocket-16core-model.log",
+        "mobilenetv2-rocket-16core-autotune.log",
     ),
     RunSpec(
         "AlexNet",
         "4",
-        "2026-05-26--18-33-05-alexnet-rocket-4core-model.log",
-        "2026-05-26--18-33-05-alexnet-rocket-4core-autotune.log",
+        "alexnet-rocket-4core-model.log",
+        "alexnet-rocket-4core-autotune.log",
     ),
     RunSpec(
         "AlexNet",
         "8",
-        "2026-05-26--19-42-37-alexnet-rocket-8core-model.log",
-        "2026-05-26--19-42-37-alexnet-rocket-8core-autotune.log",
+        "alexnet-rocket-8core-model.log",
+        "alexnet-rocket-8core-autotune.log",
     ),
     RunSpec(
         "AlexNet",
         "16",
-        "2026-05-26--20-39-30-alexnet-rocket-16core-model.log",
-        "2026-05-26--20-39-30-alexnet-rocket-16core-autotune.log",
+        "alexnet-rocket-16core-model.log",
+        "alexnet-rocket-16core-autotune.log",
     ),
 ]
 
@@ -176,17 +177,56 @@ def parse_autotune_metadata(path: Path) -> dict[str, dict[str, str | bool]]:
     return metadata
 
 
+def first_existing_path(candidates: list[Path]) -> Path:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    formatted = "\n  ".join(str(candidate) for candidate in candidates)
+    raise FileNotFoundError(f"model_spec.json not found. Tried:\n  {formatted}")
+
+
 def model_spec_path(spec: RunSpec) -> Path:
     if spec.model == "AlexNet":
-        return IR_DIR / "alexnet-rocket" / "model_spec.json"
+        return first_existing_path(
+            [
+                ARTIFACT_ROOT / "alexnet" / "scalar" / "model_spec.json",
+                ARTIFACT_ROOT / "alexnet" / "rocket" / "model_spec.json",
+                LEGACY_IR_DIR / "alexnet-rocket" / "model_spec.json",
+            ]
+        )
     if spec.model == "MobileNetV2" and spec.backend == "Gemmini 2":
-        return IR_DIR / "mobilenet-gemmini" / "model_spec.json"
+        return first_existing_path(
+            [
+                ARTIFACT_ROOT / "mobilenetv2" / "gemmini" / "model_spec.json",
+                ARTIFACT_ROOT / "mobilenet" / "gemmini" / "model_spec.json",
+                LEGACY_IR_DIR / "mobilenet-gemmini" / "model_spec.json",
+            ]
+        )
     if spec.model == "MobileNetV2":
-        return IR_DIR / "mobilenet-rocket" / "model_spec.json"
+        return first_existing_path(
+            [
+                ARTIFACT_ROOT / "mobilenetv2" / "scalar" / "model_spec.json",
+                ARTIFACT_ROOT / "mobilenetv2" / "rocket" / "model_spec.json",
+                ARTIFACT_ROOT / "mobilenet" / "scalar" / "model_spec.json",
+                ARTIFACT_ROOT / "mobilenet" / "rocket" / "model_spec.json",
+                LEGACY_IR_DIR / "mobilenet-rocket" / "model_spec.json",
+            ]
+        )
     if spec.model == "SqueezeNet" and spec.backend == "Gemmini 2":
-        return IR_DIR / "squeezenet-gemmini" / "model_spec.json"
+        return first_existing_path(
+            [
+                ARTIFACT_ROOT / "squeezenet" / "gemmini" / "model_spec.json",
+                LEGACY_IR_DIR / "squeezenet-gemmini" / "model_spec.json",
+            ]
+        )
     if spec.model == "SqueezeNet":
-        return IR_DIR / "squeezenet-rocket" / "model_spec.json"
+        return first_existing_path(
+            [
+                ARTIFACT_ROOT / "squeezenet" / "scalar" / "model_spec.json",
+                ARTIFACT_ROOT / "squeezenet" / "rocket" / "model_spec.json",
+                LEGACY_IR_DIR / "squeezenet-rocket" / "model_spec.json",
+            ]
+        )
     raise ValueError(f"no model spec mapping for {spec.model} {spec.backend}")
 
 

@@ -4,8 +4,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -
 export WORKSPACE="$(cd -- "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
 # Buddy-MLIR
 export BUDDY_BINARY_DIR="$WORKSPACE/buddy-mlir/build/bin"
-# Chipyard
-export CHIPYARD_ENV_PATH="$WORKSPACE/chipyard/env.sh"
 # triton-chipyard-opt path
 export TRITON_CHIPYARD_OPT_PATH="$WORKSPACE/triton/build/cmake.linux-x86_64-cpython-3.12/third_party/triton_chipyard/tools/triton-chipyard-opt/triton-chipyard-opt"
 # LLVM project
@@ -38,3 +36,35 @@ export TRITON_CHIPYARD_RISCV_MABI="lp64d"
 # export TRITON_CHIPYARD_RISCV_MARCH=rv64imafdcv_zicsr_zifencei_zvl128b
 # export TRITON_CHIPYARD_RISCV_MABI=lp64d
 # export TRITON_CHIPYARD_RISCV_VARCH=vlen:128,elen:64
+
+# Chipyard
+export CHIPYARD_DIR="${CHIPYARD_DIR:-$WORKSPACE/chipyard}"
+export CHIPYARD_ENV_PATH="${CHIPYARD_ENV_PATH:-$CHIPYARD_DIR/env.sh}"
+export FIREMARSHAL_DIR="${FIREMARSHAL_DIR:-$CHIPYARD_DIR/software/firemarshal}"
+export FIREMARSHAL_CONFIG_PATH="${FIREMARSHAL_CONFIG_PATH:-$FIREMARSHAL_DIR/marshal-config.yaml}"
+export FIREMARSHAL_IMAGE_DIR="${FIREMARSHAL_IMAGE_DIR:-$FIREMARSHAL_DIR/images/firechip}"
+export FIRESIM_DIR="${FIRESIM_DIR:-$CHIPYARD_DIR/sims/firesim}"
+export FIRESIM_DEPLOY_DIR="${FIRESIM_DEPLOY_DIR:-$FIRESIM_DIR/deploy}"
+export FIRESIM_HWDB_PATH="${FIRESIM_HWDB_PATH:-$FIRESIM_DEPLOY_DIR/config_hwdb.yaml}"
+export FIRESIM_BUILD_RECIPES_PATH="${FIRESIM_BUILD_RECIPES_PATH:-$FIRESIM_DEPLOY_DIR/config_build_recipes.yaml}"
+export FIRESIM_WORKLOAD_DIR="${FIRESIM_WORKLOAD_DIR:-$FIRESIM_DEPLOY_DIR/workloads}"
+export PYTORCH_CHIPYARD_WORKLOAD_DIR="${PYTORCH_CHIPYARD_WORKLOAD_DIR:-$FIREMARSHAL_DIR/custom_application/pytorch-chipyard-workloads}"
+export PYTORCH_CHIPYARD_RESULTS_WORKLOAD_DIR="${PYTORCH_CHIPYARD_RESULTS_WORKLOAD_DIR:-$FIRESIM_DEPLOY_DIR/results-workload}"
+export PYTORCH_CHIPYARD_FPGA_DB="${PYTORCH_CHIPYARD_FPGA_DB:-/opt/firesim-db.json}"
+export PYTORCH_CHIPYARD_FIREMARSHAL_TMP_DIR="${PYTORCH_CHIPYARD_FIREMARSHAL_TMP_DIR:-$WORKSPACE/.firemarshal/tmp}"
+export FIRESIM_RUNS_DIR="${FIRESIM_RUNS_DIR:-$WORKSPACE/FIRESIM_RUNS_DIR}"
+export PYTORCH_CHIPYARD_FIRESIM_RUNTIME_DIR="${PYTORCH_CHIPYARD_FIRESIM_RUNTIME_DIR:-$WORKSPACE/.firesim-runtime}"
+export PYTORCH_CHIPYARD_FIRESIM_RUN_FARM_HOST="${PYTORCH_CHIPYARD_FIRESIM_RUN_FARM_HOST:-localhost}"
+export PYTORCH_CHIPYARD_FIRESIM_RUN_FARM_SPEC="${PYTORCH_CHIPYARD_FIRESIM_RUN_FARM_SPEC:-one_fpgas_spec}"
+export PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR="${PYTORCH_CHIPYARD_FIGURE_RESULTS_WORKLOAD_DIR:-$WORKSPACE/scripts/figures/results-workload}"
+export PYTORCH_CHIPYARD_ARTIFACT_ROOT="${PYTORCH_CHIPYARD_ARTIFACT_ROOT:-$WORKSPACE/examples}"
+export PYTORCH_CHIPYARD_CONDA_ENV="${PYTORCH_CHIPYARD_CONDA_ENV:-pytorch-chipyard}"
+
+# FireMarshal reads MARSHAL_* environment variables as config overrides.
+export MARSHAL_FIRESIM_DIR="${MARSHAL_FIRESIM_DIR:-$FIRESIM_DIR}"
+export MARSHAL_MOUNT_DIR="${MARSHAL_MOUNT_DIR:-$WORKSPACE/.firemarshal/disk-mount}"
+
+# guestmount fallback paths. The build script assumes sudo, but these keep the
+# fallback usable on hosts where libguestfs is configured for unprivileged use.
+export LIBGUESTFS_CACHEDIR="${LIBGUESTFS_CACHEDIR:-$WORKSPACE/.firemarshal/libguestfs-cache}"
+export LIBGUESTFS_TMPDIR="${LIBGUESTFS_TMPDIR:-$WORKSPACE/.firemarshal/libguestfs-tmp}"
